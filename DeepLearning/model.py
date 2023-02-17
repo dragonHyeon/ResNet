@@ -1,35 +1,90 @@
-import torch
 import torch.nn as nn
 
+from DeepLearning.layer import BasicBlock, BottleNeck
 
-class VGG(nn.Module):
-    def __init__(self, cfg, num_classes=100, init_weights=True):
+
+class ResNet(nn.Module):
+    def __init__(self, block_type, num_blocks_list, in_channels=3, num_classes=100, init_weights=True):
         """
         * 모델 구조 정의
-        :param cfg: VGG 모델 옵션 (VGGNet feature extractor 옵션)
+        :param block_type: BasicBlock / BottleNeck 선택
+        :param num_blocks_list: 스테이지 당 블록 몇 개씩 쌓을지
         :param num_classes: 출력 클래스 개수
         :param init_weights: 가중치 초기화 여부
         """
 
-        super(VGG, self).__init__()
+        super(ResNet, self).__init__()
 
-        # feature extractor
-        self.features = make_layers(cfg=cfg)
-
-        # classifier
-        self.classifier = nn.Sequential(
-            nn.Linear(in_features=512 * 7 * 7, out_features=4096),
+        #
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(num_features=64),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.Linear(in_features=4096, out_features=4096),
-            nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.Linear(in_features=4096, out_features=num_classes)
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
+
+        #
+        self.stage1 = self._make_layer(block_type=block_type,
+                                       num_blocks=num_blocks_list[0],
+                                       in_channels=64,
+                                       out_channels=64,
+                                       stride=1)
+
+        #
+        self.stage2 = self._make_layer(block_type=block_type,
+                                       num_blocks=num_blocks_list[1],
+                                       in_channels=64 * block_type.expansion,
+                                       out_channels=128,
+                                       stride=2)
+
+        #
+        self.stage3 = self._make_layer(block_type=block_type,
+                                       num_blocks=num_blocks_list[2],
+                                       in_channels=128 * block_type.expansion,
+                                       out_channels=256,
+                                       stride=2)
+
+        #
+        self.stage4 = self._make_layer(block_type=block_type,
+                                       num_blocks=num_blocks_list[3],
+                                       in_channels=256 * block_type.expansion,
+                                       out_channels=512,
+                                       stride=2)
+
+        #
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+
+        #
+        self.fc = nn.Linear(in_features=512 * block_type.expansion,
+                            out_features=num_classes,
+                            bias=True)
 
         # 가중치 초기화
         if init_weights:
             self._initialize_weights()
+
+    @staticmethod
+    def _make_layer(block_type, num_blocks, in_channels, out_channels, stride):
+        """
+
+        :param block_type:
+        :param num_blocks:
+        :param in_channels:
+        :param out_channels:
+        :param stride:
+        :return:
+        """
+
+        layers = list()
+
+        layers.append(block_type(in_channels=in_channels, out_channels=out_channels, stride=stride))
+
+        in_channels = out_channels * block_type.expansion
+
+        for _ in range(num_blocks - 1):
+            layers.append(block_type(in_channels=in_channels, out_channels=out_channels, stride=stride))
+
+        return nn.Sequential(*layers)
 
     def forward(self, x):
         """
@@ -38,14 +93,16 @@ class VGG(nn.Module):
         :return: 배치 개수 만큼의 출력. (N, 100)
         """
 
-        # (N, 3, 224, 224) -> (N, 512, 7, 7)
-        x = self.features(x)
-        # (N, 512, 7, 7) -> (N, 512 * 7 * 7)
-        x = torch.flatten(x, 1)
-        # (N, 512 * 7 * 7) -> (N, 100)
-        x = self.classifier(x)
+        #
+        out = self.conv(x)
+        out = self.stage1(out)
+        out = self.stage2(out)
+        out = self.stage3(out)
+        out = self.stage4(out)
+        out = self.avgpool(out)
+        out = self.fc(out)
 
-        return x
+        return out
 
     def _initialize_weights(self):
         """
@@ -66,72 +123,19 @@ class VGG(nn.Module):
                 nn.init.constant_(tensor=m.bias, val=0)
 
 
-def make_layers(cfg):
+def resnet18():
     """
-    * VGGNet feature extractor
-    :param cfg: 'A', 'B', 'D', 'E' 중에 선택 (VGG-11, VGG-13, VGG-16, VGG-19)
-    :return: VGGNet feature extractor 만들어 줌
-    """
-
-    # VGGNet feature extractor 담을 리스트
-    layers = []
-
-    in_channels = 3
-    for v in cfg:
-        if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-        else:
-            layers += [nn.Conv2d(in_channels=in_channels, out_channels=v, kernel_size=3, stride=1, padding=1)]
-            layers += [nn.ReLU()]
-            in_channels = v
-
-    return nn.Sequential(*layers)
-
-
-# VGG 모델 옵션 (VGGNet feature extractor 옵션)
-cfgs = {
-    # VGG-11
-    'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    # VGG-13
-    'B': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    # VGG-16
-    'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
-    # VGG-19
-    'E': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
-}
-
-
-def vgg11():
-    """
-    * VGG-11
-    :return: VGG 11-layer 모델
+    * ResNet-18
+    :return: ResNet 18-layer 모델
     """
 
-    return VGG(cfg=cfgs['A'])
+    return ResNet(block_type=BasicBlock, num_blocks_list=[2, 2, 2, 2])
 
 
-def vgg13():
+def resnet50():
     """
-    * VGG-13
-    :return: VGG 13-layer 모델
-    """
-
-    return VGG(cfg=cfgs['B'])
-
-
-def vgg16():
-    """
-    * VGG-16
-    :return: VGG 16-layer 모델
+    * ResNet-50
+    :return: ResNet 50-layer 모델
     """
 
-    return VGG(cfg=cfgs['D'])
-
-
-def vgg19():
-    """
-    * VGG-19
-    :return: VGG 19-layer 모델
-    """
-
-    return VGG(cfg=cfgs['E'])
+    return ResNet(block_type=BottleNeck, num_blocks_list=[3, 4, 6, 3])
