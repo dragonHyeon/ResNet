@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from DeepLearning.layer import BasicBlock, BottleNeck
@@ -15,7 +16,7 @@ class ResNet(nn.Module):
 
         super(ResNet, self).__init__()
 
-        #
+        # (N, in_channels (3), H, W) -> (N, 64, H/2, W/2)
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=3, stride=1, padding=1, bias=True),
             nn.BatchNorm2d(num_features=64),
@@ -23,38 +24,38 @@ class ResNet(nn.Module):
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         )
 
-        #
+        # (N, 64, H/2, W/2) -> (N, 64*block_type.expansion, H/2, W/2)
         self.stage1 = self._make_layer(block_type=block_type,
                                        num_blocks=num_blocks_list[0],
                                        in_channels=64,
                                        out_channels=64,
                                        stride=1)
 
-        #
+        # (N, 64*block_type.expansion, H/2, W/2) -> (N, 128*block_type.expansion, H/4, W/4)
         self.stage2 = self._make_layer(block_type=block_type,
                                        num_blocks=num_blocks_list[1],
                                        in_channels=64 * block_type.expansion,
                                        out_channels=128,
                                        stride=2)
 
-        #
+        # (N, 128*block_type.expansion, H/4, W/4) -> (N, 256*block_type.expansion, H/8, W/8)
         self.stage3 = self._make_layer(block_type=block_type,
                                        num_blocks=num_blocks_list[2],
                                        in_channels=128 * block_type.expansion,
                                        out_channels=256,
                                        stride=2)
 
-        #
+        # (N, 256*block_type.expansion, H/8, W/8) -> (N, 512*block_type.expansion, H/16, W/16)
         self.stage4 = self._make_layer(block_type=block_type,
                                        num_blocks=num_blocks_list[3],
                                        in_channels=256 * block_type.expansion,
                                        out_channels=512,
                                        stride=2)
 
-        #
+        # (N, 512*block_type.expansion, H/16, W/16) -> (N, 512*block_type.expansion, 1, 1)
         self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
 
-        #
+        # (N, 512*block_type.expansion) -> (N, num_classes (100))
         self.fc = nn.Linear(in_features=512 * block_type.expansion,
                             out_features=num_classes,
                             bias=True)
@@ -66,40 +67,52 @@ class ResNet(nn.Module):
     @staticmethod
     def _make_layer(block_type, num_blocks, in_channels, out_channels, stride):
         """
-
-        :param block_type:
-        :param num_blocks:
-        :param in_channels:
-        :param out_channels:
-        :param stride:
-        :return:
+        * Residual Block 모음 만들기
+        :param block_type: BasicBlock / BottleNeck 선택
+        :param num_blocks: 해당 스테이지 블록 몇 개 쌓을지
+        :param in_channels: in_channels 수
+        :param out_channels: out_channels 수
+        :param stride: stride 값
+        :return: Residual Block 모음
         """
 
+        # Residual Block 모음 담을 리스트
         layers = list()
 
+        # convolution block 담기
         layers.append(block_type(in_channels=in_channels, out_channels=out_channels, stride=stride))
 
+        # in_channels 값 갱신
         in_channels = out_channels * block_type.expansion
 
+        # identity block 담기
         for _ in range(num_blocks - 1):
-            layers.append(block_type(in_channels=in_channels, out_channels=out_channels, stride=stride))
+            layers.append(block_type(in_channels=in_channels, out_channels=out_channels, stride=1))
 
         return nn.Sequential(*layers)
 
     def forward(self, x):
         """
         * 순전파
-        :param x: 배치 개수 만큼의 입력. (N, 3, 224, 224)
-        :return: 배치 개수 만큼의 출력. (N, 100)
+        :param x: 배치 개수 만큼의 입력. (N, in_channels (3), H, W)
+        :return: 배치 개수 만큼의 출력. (N, num_classes (100))
         """
 
-        #
+        # (N, in_channels (3), H, W) -> (N, 64, H/2, W/2)
         out = self.conv(x)
+        # (N, 64, H/2, W/2) -> (N, 64*block_type.expansion, H/2, W/2)
         out = self.stage1(out)
+        # (N, 64*block_type.expansion, H/2, W/2) -> (N, 128*block_type.expansion, H/4, W/4)
         out = self.stage2(out)
+        # (N, 128*block_type.expansion, H/4, W/4) -> (N, 256*block_type.expansion, H/8, W/8)
         out = self.stage3(out)
+        # (N, 256*block_type.expansion, H/8, W/8) -> (N, 512*block_type.expansion, H/16, W/16)
         out = self.stage4(out)
+        # (N, 512*block_type.expansion, H/16, W/16) -> (N, 512*block_type.expansion, 1, 1)
         out = self.avgpool(out)
+        # (N, 512*block_type.expansion, 1, 1) -> (N, 512*block_type.expansion*1*1)
+        out = torch.flatten(out, 1)
+        # (N, 512*block_type.expansion) -> (N, num_classes (100))
         out = self.fc(out)
 
         return out
