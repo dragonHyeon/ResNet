@@ -41,7 +41,7 @@ class BasicBlock(nn.Module):
             conv3x3(in_channels=in_channels, out_channels=out_channels, stride=stride),
             nn.BatchNorm2d(num_features=out_channels),
             nn.ReLU(),
-            conv3x3(in_channels=in_channels, out_channels=out_channels * BasicBlock.expansion, stride=1)
+            conv3x3(in_channels=out_channels, out_channels=out_channels * BasicBlock.expansion, stride=1)
         )
 
         # shortcut 에서 stride 혹은 channel 에 변화 줘야하는지 조건
