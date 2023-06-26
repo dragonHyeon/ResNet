@@ -10,6 +10,7 @@ class ResNet(nn.Module):
         * 모델 구조 정의
         :param block_type: BasicBlock / BottleNeck 선택
         :param num_blocks_list: 스테이지 당 블록 몇 개씩 쌓을지
+        :param in_channels: in_channels 수
         :param num_classes: 출력 클래스 개수
         :param init_weights: 가중치 초기화 여부
         """
