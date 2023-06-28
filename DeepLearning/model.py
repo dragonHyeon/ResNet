@@ -5,7 +5,7 @@ from DeepLearning.layer import BasicBlock, BottleNeck
 
 
 class ResNet(nn.Module):
-    def __init__(self, block_type, num_blocks_list, in_channels=3, num_classes=100, init_weights=True):
+    def __init__(self, block_type, num_blocks_list, in_channels, num_classes, init_weights):
         """
         * 모델 구조 정의
         :param block_type: BasicBlock / BottleNeck 선택
@@ -137,19 +137,25 @@ class ResNet(nn.Module):
                 nn.init.constant_(tensor=m.bias, val=0)
 
 
-def resnet18():
+def resnet18(in_channels=3, num_classes=100, init_weights=True):
     """
     * ResNet-18
+    :param in_channels: in_channels 수
+    :param num_classes: 출력 클래스 개수
+    :param init_weights: 가중치 초기화 여부
     :return: ResNet 18-layer 모델
     """
 
-    return ResNet(block_type=BasicBlock, num_blocks_list=[2, 2, 2, 2])
+    return ResNet(block_type=BasicBlock, num_blocks_list=[2, 2, 2, 2], in_channels=in_channels, num_classes=num_classes, init_weights=init_weights)
 
 
-def resnet50():
+def resnet50(in_channels=3, num_classes=100, init_weights=True):
     """
     * ResNet-50
+    :param in_channels: in_channels 수
+    :param num_classes: 출력 클래스 개수
+    :param init_weights: 가중치 초기화 여부
     :return: ResNet 50-layer 모델
     """
 
-    return ResNet(block_type=BottleNeck, num_blocks_list=[3, 4, 6, 3])
+    return ResNet(block_type=BottleNeck, num_blocks_list=[3, 4, 6, 3], in_channels=in_channels, num_classes=num_classes, init_weights=init_weights)
