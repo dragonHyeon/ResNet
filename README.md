@@ -18,5 +18,12 @@ ___
 - DeepLearning/layer.py 에 모델을 구성하기 위한 nn.Module 들을 미리 만들어 놓고 DeepLearning/model.py 에서 모델을 구성하는데 사용
 - 모델 선언은 DeepLearning/model.py 에서 미리 선언되어 있는 모델들중에서 가져올 것. (resnet18, resnet50)
 ---
+### 실행 결과물
+- Training progress
+<p align="center">
+    <img width="500" src="./IMGS/training_progress.png" alt="Training progress">
+</p>
+
+---
 ### 참조
 https://github.com/MV-CuttingEdgeAI/YHKim-DeepLearningStudy
